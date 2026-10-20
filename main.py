@@ -8,7 +8,7 @@ from discord import app_commands
 # ---------------------------------------------------------
 # ضع رقم سيرفرك (Server ID / Guild ID) هنا بين الأقواس
 # مثال: GUILD_ID = discord.Object(id=123456789012345678)
-GUILD_ID = discord.Object(id=ضع_رقم_السيرفر_هنا)
+GUILD_ID = discord.Object(id=1524150798458818821)
 # ---------------------------------------------------------
 
 # خادم Flask لإبقاء البوت متصلاً 24/7
