@@ -4,7 +4,7 @@ from threading import Thread
 import discord
 from discord.ext import commands
 
-GUILD_ID = discord.Object(id=ضع_رقم_السيرفر_هنا)
+GUILD_ID = discord.Object(id=1524150798458818821)
 
 app = Flask('')
 
