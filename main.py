@@ -1,5 +1,7 @@
 import os
 import random
+import json
+import urllib.request
 from flask import Flask
 from threading import Thread
 import discord
@@ -7,11 +9,11 @@ from discord.ext import commands
 from discord import app_commands
 
 # ---------------------------------------------------------
-# تم وضع رقم سيرفرك الخاص (Guild ID) بنجاح
+# رقم سيرفرك الخاص (Guild ID) مضاف ومثبت جاهزاً
 GUILD_ID = discord.Object(id=1524150798458818821)
 # ---------------------------------------------------------
 
-# خادم Flask لإبقاء البوت متصلاً 24/7
+# خادم Flask لإبقاء البوت متصلاً 24/7 على Render
 app = Flask('')
 
 @app.route('/')
@@ -35,10 +37,48 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     bot.tree.copy_global_to(guild=GUILD_ID)
     await bot.tree.sync(guild=GUILD_ID)
-    print(f"Logged in as {bot.user} - 30+ Commands synced successfully!")
+    print(f"Logged in as {bot.user} - All commands synced successfully!")
 
 # ==========================================
-# 🛡️ 1. أوامر الإشراف والتنظيم (Admin & Mod)
+# 🤖 1. أمر الذكاء الاصطناعي (AI Smart Command)
+# ==========================================
+
+@bot.tree.command(name="8ball", description="اسأل الذكاء الاصطناعي أي سؤال وسيجيبك بدقة")
+async def ball(interaction: discord.Interaction, question: str):
+    await interaction.response.defer()
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    # استخدام Gemini API إذا كان مفتاح الـ API مضافاً في Render
+    if api_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            prompt = f"أنت مساعد ذكي ولطيف في ديسكورد للبوت Drapt Bot. أجب عن هذا السؤال بأسلوب مختصر ومفيد (لا تتجاوز 3 جمل): {question}"
+            
+            data = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+            
+            with urllib.request.urlopen(req) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                ai_reply = result['candidates'][0]['content']['parts'][0]['text']
+                await interaction.followup.send(f"❓ **السؤال:** {question}\n🤖 **الذكاء الاصطناعي:**\n{ai_reply}")
+                return
+        except Exception as e:
+            print(f"AI Error: {e}")
+
+    # إجابة احتياطية ذكية في حال عدم إضافة مفتاح الـ API بعد
+    responses = [
+        "نعم، بالتأكيد!",
+        "لا أعتقد ذلك.",
+        "من المحتمل جداً.",
+        "تم إنشائي وتطويري بواسطة المطور المحترف moha11dz!",
+        "سؤال رائع! الإجابة تعتمد على كيفية رؤيتك للأمر."
+    ]
+    reply = random.choice(responses)
+    await interaction.followup.send(f"❓ **السؤال:** {question}\n🔮 **الإجابة:** {reply}")
+
+# ==========================================
+# 🛡️ 2. أوامر الإشراف والتنظيم (Admin & Mod)
 # ==========================================
 
 @bot.tree.command(name="kick", description="طرد عضو من السيرفر")
@@ -114,7 +154,7 @@ async def unlock(interaction: discord.Interaction):
     await interaction.followup.send("🔓 تم فتح الروم.")
 
 # ==========================================
-# 📊 2. أوامر المعلومات (Info & Stats)
+# 📊 3. أوامر المعلومات (Info & Stats)
 # ==========================================
 
 @bot.tree.command(name="ping", description="عرض سرعة استجابة البوت")
@@ -160,7 +200,7 @@ async def botinfo(interaction: discord.Interaction):
     await interaction.followup.send(f"🤖 أنا بوت شغال على Render بحالة ممتازة ومتصل بـ {len(bot.guilds)} سيرفر!")
 
 # ==========================================
-# 🎲 3. أوامر التسلية والترفيه (Fun)
+# 🎲 4. أوامر التسلية والترفيه (Fun)
 # ==========================================
 
 @bot.tree.command(name="roll", description="رمي نرد من 1 إلى 6 (أو أي رقم تحدده)")
@@ -174,13 +214,6 @@ async def coinflip(interaction: discord.Interaction):
     await interaction.response.defer()
     result = random.choice(["👑 ملك (Heads)", "📜 كتابة (Tails)"])
     await interaction.followup.send(f"🪙 النتيجة: **{result}**")
-
-@bot.tree.command(name="8ball", description="اسأل البوت سؤالاً وسيجيبك بشكل عشوائي")
-async def ball(interaction: discord.Interaction, question: str):
-    await interaction.response.defer()
-    responses = ["نعم بالتأكيد!", "لا أعتقد ذلك.", "من المحتمل جداً.", "سؤال صعب، حاول مجدداً.", "مستحيل!"]
-    reply = random.choice(responses)
-    await interaction.followup.send(f"❓ **السؤال:** {question}\n🔮 **الإجابة:** {reply}")
 
 @bot.tree.command(name="rps", description="لعبة حجر ورقة مقص")
 async def rps(interaction: discord.Interaction, choice: str):
@@ -212,7 +245,7 @@ async def ship(interaction: discord.Interaction, user1: discord.Member, user2: d
     await interaction.followup.send(f"❤️ نسبة التوافق بين {user1.mention} و {user2.mention} هي: **{percentage}%**")
 
 # ==========================================
-# 🛠️ 4. أدوات عامة وأوامر خفيفة (Utilities & Misc)
+# 🛠️ 5. أدوات عامة وأوامر خفيفة (Utilities & Misc)
 # ==========================================
 
 @bot.tree.command(name="say", description="جعل البوت يكرر كلامك")
@@ -277,7 +310,7 @@ async def invite(interaction: discord.Interaction):
     link = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands"
     await interaction.followup.send(f"🔗 يمكنك دعوة البوت عبر هذا الرابط:\n{link}")
 
-# تشغيل خادم Flask وتشغيل البوت
+# تشغيل خادم Flask ثم البوت
 keep_alive()
 token = os.environ.get("DISCORD_TOKEN")
 bot.run(token)
