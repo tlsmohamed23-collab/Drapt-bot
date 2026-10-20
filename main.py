@@ -12,7 +12,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    print(f'تم تسجيل الدخول بنجاح باسم {bot.user}')
+    print(f"Logged in successfully as {bot.user}")
 
 # أمر الطرد (Kick)
 @bot.tree.command(name="kick", description="طرد عضو من السيرفر")
