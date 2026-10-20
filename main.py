@@ -1,12 +1,11 @@
 import os
 import random
-import json
-import urllib.request
 from flask import Flask
 from threading import Thread
 import discord
 from discord.ext import commands
 from discord import app_commands
+from google import genai
 
 # ---------------------------------------------------------
 # رقم سيرفرك الخاص (Guild ID)
@@ -39,7 +38,7 @@ async def on_ready():
     print(f"Logged in as {bot.user} - All commands synced successfully!")
 
 # ==========================================
-# 🧠 1. أمر الذكاء الاصطناعي المنطقي (AI Smart Assistant)
+# 🧠 1. أمر الذكاء الاصطناعي المنطقي (Gemini AI)
 # ==========================================
 
 @bot.tree.command(name="ai", description="اطرح أي سؤال على الذكاء الاصطناعي وسيجيبك بتحليل منطقي وذكي")
@@ -50,41 +49,40 @@ async def ai_cmd(interaction: discord.Interaction, question: str):
     
     if api_key:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            # استخدام المكتبة الرسمية لـ Gemini
+            client = genai.Client(api_key=api_key)
             
-            # تعليمات وتوجيه الذكاء الاصطناعي للرد بأسلوب منطقي، عقلاني، وواضح
             system_prompt = (
-                "أنت مساعد ذكاء اصطناعي منطقي وذكي ومحترف في سيرفر ديسكورد. "
-                "أجب عن جميع الأسئلة بأسلوب عقلاني، تحليلي، ومفهوم بوضوح. "
+                "أنت مساعد ذكاء اصطناعي منطقي وذكي ومحترف في سيرفر ديسكورد للبوت Drapt Bot. "
+                "أجب عن جميع الأسئلة بأسلوب عقلاني، تحليلي، ومفهوم بوضوح مثل المساعد الشخصي المطور. "
                 "إذا كان السؤال عن صانعك، فأوضح أنك بوت تم تطويره بواسطة moha11dz. "
                 "اجعل إجاباتك جادة ومفيدة ودقيقة دون كلام عشوائي، واحرص على ألا تتجاوز الإجابة فقرة واحدة أو فقرتين قصيرتين."
             )
             
-            full_prompt = f"{system_prompt}\n\nسؤال المستخدم: {question}"
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=f"{system_prompt}\n\nسؤال المستخدم: {question}"
+            )
             
-            data = json.dumps({"contents": [{"parts": [{"text": full_prompt}]}]}).encode('utf-8')
-            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+            ai_reply = response.text
             
-            with urllib.request.urlopen(req) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                ai_reply = result['candidates'][0]['content']['parts'][0]['text']
-                
-                embed = discord.Embed(
-                    title="🧠 إجابة الذكاء الاصطناعي",
-                    description=ai_reply,
-                    color=discord.Color.blue()
-                )
-                embed.add_field(name="❓ السؤال المطروح", value=question, inline=False)
-                embed.set_footer(text=f"طلب بواسطة: {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
-                
-                await interaction.followup.send(embed=embed)
-                return
+            embed = discord.Embed(
+                title="🧠 إجابة الذكاء الاصطناعي",
+                description=ai_reply,
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="❓ السؤال المطروح", value=question, inline=False)
+            embed.set_footer(text=f"طلب بواسطة: {interaction.user.name}", icon_url=interaction.user.display_avatar.url)
+            
+            await interaction.followup.send(embed=embed)
+            return
         except Exception as e:
             print(f"AI Error: {e}")
+            await interaction.followup.send(f"⚠️ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: `{e}`")
+            return
 
     await interaction.followup.send("⚠️ تعذر الاتصال بمحرك الذكاء الاصطناعي. تأكد من ضبط مفتاح `GEMINI_API_KEY` في إعدادات Render.")
 
-# أمر 8ball المنطقي للتوافق مع الأمر القديم
 @bot.tree.command(name="8ball", description="اسأل الذكاء الاصطناعي سؤالاً منطقياً")
 async def ball(interaction: discord.Interaction, question: str):
     await ai_cmd(interaction, question)
