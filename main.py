@@ -1,5 +1,7 @@
 import os
 import random
+import json
+import urllib.request
 from flask import Flask
 from threading import Thread
 import discord
@@ -31,6 +33,10 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# قواميس لتخزين الردود التلقائية العادية والـ Embed
+auto_replies = {}
+auto_embeds = {}
+
 @bot.event
 async def on_ready():
     bot.tree.copy_global_to(guild=GUILD_ID)
@@ -38,7 +44,90 @@ async def on_ready():
     print(f"Logged in as {bot.user} - All commands synced successfully!")
 
 # ==========================================
-# 🧠 1. أمر الذكاء الاصطناعي المنطقي (Gemini AI)
+# 🤖 1. مستمع الرسائل للردود التلقائية (Auto-Reply Listener)
+# ==========================================
+
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+
+    content = message.content.strip().lower()
+
+    # الرد التلقائي العادي
+    if content in auto_replies:
+        await message.channel.send(auto_replies[content])
+
+    # الرد التلقائي المنسق (Embed)
+    elif content in auto_embeds:
+        data = auto_embeds[content]
+        embed = discord.Embed(
+            title=data["title"],
+            description=data["description"],
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text=f"رد تلقائي لسيرفر {message.guild.name}")
+        await message.channel.send(embed=embed)
+
+    await bot.process_commands(message)
+
+# ==========================================
+# ⚡ 2. الأوامر الجديدة (Auto-Replies & Server Status)
+# ==========================================
+
+@bot.tree.command(name="auto-reply", description="إضافة رد تلقائي عادي عند كتابة كلمة محددة")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def auto_reply_cmd(interaction: discord.Interaction, keyword: str, reply: str):
+    await interaction.response.defer()
+    auto_replies[keyword.strip().lower()] = reply
+    await interaction.followup.send(f"✅ تم إضافة رد تلقائي للكلمة: **{keyword}**\n💬 الرد: {reply}")
+
+@bot.tree.command(name="auto-embed", description="إضافة رد تلقائي منسق (Embed) عند كتابة كلمة محددة")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def auto_embed_cmd(interaction: discord.Interaction, keyword: str, title: str, description: str):
+    await interaction.response.defer()
+    auto_embeds[keyword.strip().lower()] = {
+        "title": title,
+        "description": description
+    }
+    await interaction.followup.send(f"✅ تم إضافة رد تلقائي (Embed) للكلمة: **{keyword}**\n📌 العنوان: **{title}**")
+
+@bot.tree.command(name="serverstatus", description="عرض حالة سيرفر الماينكرافت وعدد اللاعبين")
+async def serverstatus_cmd(interaction: discord.Interaction, server_ip: str = "draptsmp.finalhost.site"):
+    await interaction.response.defer()
+    try:
+        url = f"https://api.mcsrvstat.us/2/{server_ip}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            
+            if data.get("online"):
+                players_online = data["players"]["online"]
+                players_max = data["players"]["max"]
+                version = data.get("version", "1.21.11")
+                
+                embed = discord.Embed(
+                    title=f"🎮 حالة السيرفر: {server_ip}",
+                    color=discord.Color.green()
+                )
+                embed.add_field(name="🟢 الحالة", value="متصل (Online)", inline=True)
+                embed.add_field(name="👥 اللاعبين", value=f"{players_online} / {players_max}", inline=True)
+                embed.add_field(name="📌 الإصدار", value=version, inline=True)
+            else:
+                embed = discord.Embed(
+                    title=f"🎮 حالة السيرفر: {server_ip}",
+                    color=discord.Color.red()
+                )
+                embed.add_field(name="🔴 الحالة", value="غير متصل (Offline)", inline=False)
+
+            await interaction.followup.send(embed=embed)
+    except Exception as e:
+        print(f"Server Status Error: {e}")
+        await interaction.followup.send("⚠️ تعذر جلب حالة السيرفر حالياً. التأكد من عنوان IP.")
+
+# ==========================================
+# 🧠 3. أمر الذكاء الاصطناعي (Gemini AI)
 # ==========================================
 
 @bot.tree.command(name="ai", description="اطرح أي سؤال على الذكاء الاصطناعي وسيجيبك بتحليل منطقي وذكي")
@@ -49,7 +138,6 @@ async def ai_cmd(interaction: discord.Interaction, question: str):
     
     if api_key:
         try:
-            # استخدام المكتبة الرسمية لـ Gemini
             client = genai.Client(api_key=api_key)
             
             system_prompt = (
@@ -88,7 +176,7 @@ async def ball(interaction: discord.Interaction, question: str):
     await ai_cmd(interaction, question)
 
 # ==========================================
-# 🛡️ 2. أوامر الإشراف والتنظيم (Admin & Mod)
+# 🛡️ 4. أوامر الإشراف والتنظيم (Admin & Mod)
 # ==========================================
 
 @bot.tree.command(name="kick", description="طرد عضو من السيرفر")
@@ -142,7 +230,7 @@ async def unlock(interaction: discord.Interaction):
     await interaction.followup.send("🔓 تم فتح الروم.")
 
 # ==========================================
-# 📊 3. أوامر المعلومات والخدمات (Info & Utilities)
+# 📊 5. أوامر المعلومات والخدمات (Info & Utilities)
 # ==========================================
 
 @bot.tree.command(name="ping", description="عرض سرعة استجابة البوت")
